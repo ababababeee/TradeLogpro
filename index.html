@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Ultimate Trader's Journal</title>
+    <!-- Подключение Tailwind CSS для стильного и адаптивного дизайна -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Общие стили для темного фона и современного шрифта */
+        body {
+            background-color: #0c1015; /* Глубокий темный фон */
+            font-family: 'Inter', sans-serif;
+            color: #e5e7eb; /* Светлый текст */
+        }
+        /* Градиент для акцента и кнопок (более насыщенный) */
+        .gradient-bg {
+            background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%); /* Изумрудный к Циановому */
+        }
+        .gradient-text {
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-image: linear-gradient(45deg, #10b981, #06b6d4);
+        }
+        /* Стили для кнопки с эффектом */
+        .cta-button {
+            position: relative;
+            z-index: 10;
+        }
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, #10b981 0%, #06b6d4 100%);
+            z-index: -1;
+            filter: blur(8px);
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+        .cta-button:hover::before {
+            opacity: 1;
+        }
+        /* Стиль для секции-демо */
+        .demo-dashboard {
+            background-color: #1a202c; /* Темно-синий фон для "окна" журнала */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header / Navigation (Навигационная панель) -->
+    <header class="sticky top-0 z-50 bg-[#0d1117] bg-opacity-95 shadow-xl backdrop-blur-sm border-b border-gray-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <a href="#" class="text-2xl font-bold gradient-text">TradeLog Pro</a>
+                <nav class="hidden md:flex space-x-8 items-center">
+                    <a href="#features" class="text-gray-400 hover:text-white transition duration-200">Features</a>
+                    <a href="#demo" class="text-gray-400 hover:text-white transition duration-200">Live Demo</a>
+                    <a href="#vision" class="text-gray-400 hover:text-white transition duration-200">About Us</a>
+                    <span class="text-sm font-bold text-yellow-400 border border-yellow-400 rounded-full px-3 py-1">ALWAYS FREE</span>
+                    <!-- Ссылка на вторичный файл журнала -->
+                    <a href="journal.html" target="_blank" class="py-2 px-4 rounded-lg text-white font-semibold gradient-bg shadow-lg hover:shadow-xl transition duration-300">Open Journal</a>
+                </nav>
+                <!-- Mobile Menu Button -->
+                <button id="menu-button" class="md:hidden text-white focus:outline-none">
+                    <!-- Иконка меню-гамбургера -->
+                    <svg id="menu-icon" class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    <!-- Иконка закрытия (скрыта по умолчанию) -->
+                    <svg id="close-icon" class="w-6 h-6 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+        </div>
+        <!-- Mobile Menu Content - Hidden by default, toggled by JS -->
+        <div id="mobile-menu" class="hidden md:hidden absolute w-full bg-[#0d1117] border-t border-gray-800 pb-4 shadow-2xl">
+            <div class="flex flex-col space-y-3 px-4 sm:px-6">
+                <a href="#features" class="block py-2 text-gray-300 hover:bg-gray-800 rounded-lg transition duration-200">Features</a>
+                <a href="#demo" class="block py-2 text-gray-300 hover:bg-gray-800 rounded-lg transition duration-200">Live Demo</a>
+                <a href="#vision" class="block py-2 text-gray-300 hover:bg-gray-800 rounded-lg transition duration-200">About Us</a>
+                <span class="block text-center text-sm font-bold text-yellow-400 border border-yellow-400 rounded-full px-3 py-1 my-2">ALWAYS FREE</span>
+                <!-- Ссылка на вторичный файл журнала -->
+                <a href="journal.html" target="_blank" class="block text-center py-3 px-4 rounded-lg text-white font-semibold gradient-bg shadow-lg hover:shadow-xl transition duration-300 mt-2">Open Journal</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section (Главный экран) -->
+        <section class="py-24 md:py-40 text-center border-b border-gray-900 relative overflow-hidden">
+            <!-- Фоновый эффект -->
+            <div class="absolute inset-0 z-0 opacity-10" style="background-image: radial-gradient(circle at center, #10b981 0%, transparent 40%);"></div>
+
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+                <span class="text-lg font-semibold tracking-wider uppercase text-emerald-400 bg-gray-800 px-3 py-1 rounded-full">
+                    Absolutely Free. Forever.
+                </span>
+                <h1 class="text-5xl md:text-8xl font-extrabold mt-6 mb-8 leading-tight">
+                    The Professional Trading Journal <span class="gradient-text">Built for Growth</span>.
+                </h1>
+                <p class="text-xl text-gray-400 mb-12 max-w-3xl mx-auto">
+                    Stop guessing, start profiting. Our intuitive, comprehensive journal helps you track every detail, eliminate mistakes, and consistently scale your performance—at zero cost.
+                </p>
+                <div id="cta" class="space-x-6">
+                    <!-- Ссылка на вторичный файл журнала -->
+                    <a href="journal.html" target="_blank" class="py-4 px-10 text-xl font-bold rounded-full text-[#0d1117] cta-button gradient-bg shadow-2xl transition duration-300 transform hover:scale-105 inline-block">
+                        Launch Journal Now (Free)
+                    </a>
+                    <a href="#demo" class="py-4 px-10 text-xl font-bold rounded-full bg-gray-700 text-white border border-gray-600 hover:bg-gray-600 transition duration-300 inline-block">
+                        See Demo
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Demo Section (Мини-журнал - новый блок) -->
+        <section id="demo" class="py-24 md:py-32 bg-[#10141b] border-b border-gray-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-4xl font-extrabold text-center mb-4 text-white">Peek Inside: Your Future Dashboard</h2>
+                <p class="text-xl text-gray-400 text-center mb-16">Get a quick view of the core metrics that drive professional trading decisions.</p>
+
+                <!-- Mock Dashboard Container -->
+                <div class="demo-dashboard rounded-2xl p-6 lg:p-12 border border-gray-700">
+                    
+                    <!-- Top Stats Panel -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        
+                        <div class="bg-gray-800 p-4 rounded-xl text-center border border-gray-700">
+                            <p class="text-2xl font-extrabold text-emerald-400">$8,560</p>
+                            <p class="text-sm text-gray-400">Total Profit</p>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-xl text-center border border-gray-700">
+                            <p class="text-2xl font-extrabold text-white">124</p>
+                            <p class="text-sm text-gray-400">Trades Logged</p>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-xl text-center border border-gray-700">
+                            <p class="text-2xl font-extrabold text-cyan-400">62%</p>
+                            <p class="text-sm text-gray-400">Win Rate</p>
+                        </div>
+                        <div class="bg-gray-800 p-4 rounded-xl text-center border border-gray-700">
+                            <p class="text-2xl font-extrabold text-yellow-400">2.1 R</p>
+                            <p class="text-sm text-gray-400">Avg R-Multiple</p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Trades Table -->
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-800">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Symbol</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">P/L ($)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider hidden sm:table-cell">Type</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider hidden lg:table-cell">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-800">
+                                <tr class="bg-[#1a202c]">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">2025-12-15</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-white">BTCUSD</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-400">$450.00</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-400 hidden sm:table-cell">Short</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">Perfect double top rejection on H4.</td>
+                                </tr>
+                                <tr class="bg-[#1a202c] hover:bg-gray-900 transition duration-150">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">2025-12-14</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-white">AAPL</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-500">$-125.50</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-green-400 hidden sm:table-cell">Long</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">Impulsive entry before news event. Lesson learned.</td>
+                                </tr>
+                                <tr class="bg-[#1a202c]">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">2025-12-14</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-white">EURUSD</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-emerald-400">$98.75</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-yellow-400 hidden sm:table-cell">Short</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden lg:table-cell">Clean break and retest of daily support.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-8 text-center">
+                        <!-- Ссылка на вторичный файл журнала -->
+                        <a href="journal.html" target="_blank" class="py-3 px-8 text-lg font-bold rounded-full text-[#0d1117] cta-button gradient-bg shadow-lg transition duration-300 hover:scale-[1.02] inline-block">
+                            Start Tracking Your Own Stats Now
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+
+        <!-- Features Section (Блок с ключевыми функциями) -->
+        <section id="features" class="py-24 md:py-32">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-4xl font-extrabold text-center mb-16 text-white">Why TradeLog Pro is Your Edge</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                    
+                    <!-- Feature 1: Detailed Analytics -->
+                    <div class="p-8 rounded-xl bg-gray-900 shadow-2xl border border-gray-800 hover:border-emerald-500 transition duration-300 transform hover:translate-y-[-4px]">
+                        <div class="p-3 w-max rounded-full bg-emerald-600/20 text-emerald-400 mb-4">
+                            <!-- Иконка: График (Stats) -->
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-2.5-3-4-5.5-4-1.2 0-2.3.5-3.2 1.3L12 11l-3-3.6c-1.3-1.6-3.4-2.2-5.1-1.4-2.3 1.1-2.9 3.8-1.5 5.9l7.7 9.8c.8 1.1 2.4 1.1 3.2 0l7.7-9.8z"/><path d="M12 11l-3 3.6"/></svg>
+                        </div>
+                        <h3 class="text-2xl font-semibold mb-3 text-white">Deep Performance Metrics</h3>
+                        <p class="text-gray-400">Automatically calculate win rates, R-multiples, and drawdowns. See exactly what works and what doesn't across different assets and strategies.</p>
+                    </div>
+
+                    <!-- Feature 2: Visual Trade Review -->
+                    <div class="p-8 rounded-xl bg-gray-900 shadow-2xl border border-gray-800 hover:border-cyan-500 transition duration-300 transform hover:translate-y-[-4px]">
+                        <div class="p-3 w-max rounded-full bg-cyan-600/20 text-cyan-400 mb-4">
+                            <!-- Иконка: Камера (Photo Upload) -->
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        </div>
+                        <h3 class="text-2xl font-semibold mb-3 text-white">Screenshot Integration</h3>
+                        <p class="text-gray-400">Upload your entry/exit charts directly to your trade log. Visual learning is crucial for pattern recognition and continuous improvement.</p>
+                    </div>
+
+                    <!-- Feature 3: Customized Note-Taking -->
+                    <div class="p-8 rounded-xl bg-gray-900 shadow-2xl border border-gray-800 hover:border-indigo-500 transition duration-300 transform hover:translate-y-[-4px]">
+                        <div class="p-3 w-max rounded-full bg-indigo-600/20 text-indigo-400 mb-4">
+                            <!-- Иконка: Блокнот (Notes) -->
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="9" y2="9"/></svg>
+                        </div>
+                        <h3 class="text-2xl font-semibold mb-3 text-white">Psychology & Discipline</h3>
+                        <p class="text-gray-400">Detailed fields to record your mental state, emotions, and discipline compliance for every trade. The key to consistency.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Image/Visual Section (Блок для вставки фото и визуализации) -->
+        <section id="vision" class="py-24 md:py-32 bg-[#10141b] border-t border-gray-900">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                    
+                    <!-- Image Placeholder (Место для вашего скриншота/фото) -->
+                    <div class="relative group rounded-xl overflow-hidden shadow-2xl border-2 border-dashed border-cyan-500/50 p-6 bg-gray-900">
+                        <!-- Использование Placehold.co для демонстрации места под изображение -->
+                        <img src="https://i.pinimg.com/736x/87/66/52/87665215e14e92af62d3090227d72e1f.jpg" 
+                            alt="Placeholder for a chart screenshot" 
+                            class="w-full h-full object-cover rounded-lg transition duration-500 group-hover:scale-[1.03] border border-gray-700"
+                            onerror="this.onerror=null; this.src='';" />
+                        <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition duration-300">
+                            <p class="text-white text-xl font-bold p-4 bg-gray-900/70 rounded-lg">Start monitoring your deposit now</p>
+                        </div>
+                    </div>
+
+                    <!-- Text Content -->
+                    <div class="lg:pl-10">
+                        <h2 class="text-4xl font-extrabold mb-4 text-white">Organize Your Charts & Ideas</h2>
+                        <p class="text-gray-400 text-lg mb-6">
+                            A picture is worth a thousand trades. With TradeLog Pro, you can easily associate critical chart screenshots, news articles, or technical setups directly with the trade entry. This creates an invaluable visual record for your future self.
+                        </p>
+                        <ul class="space-y-3 text-gray-300">
+                            <li class="flex items-start">
+                                <svg class="w-6 h-6 mr-3 text-emerald-500 flex-shrink-0 mt-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Intuitive drag-and-drop upload.
+                            </li>
+                            <li class="flex items-start">
+                                <svg class="w-6 h-6 mr-3 text-emerald-500 flex-shrink-0 mt-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Automatic timestamping and linking.
+                            </li>
+                            <li class="flex items-start">
+                                <svg class="w-6 h-6 mr-3 text-emerald-500 flex-shrink-0 mt-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Side-by-side comparison for review.
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Testimonials/Social Proof Section (Отзывы) -->
+        <section class="py-24 md:py-32 border-b border-gray-900">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h2 class="text-4xl font-extrabold text-center mb-16 text-white">What Traders Are Saying</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    
+                    <!-- Testimonial 1 -->
+                    <div class="p-6 bg-gray-900 rounded-xl shadow-2xl border border-gray-800 hover:shadow-cyan-500/20 transition duration-300">
+                        <p class="text-gray-300 italic mb-4 text-lg">"Since I started using TradeLog Pro, my consistency has skyrocketed. The PnL calculation and visual tracking capabilities are unmatched."</p>
+                        <div class="flex items-center">
+                            <img src="https://placehold.co/40x40/4f46e5/ffffff?text=JT" alt="Avatar" class="w-10 h-10 rounded-full mr-3 border-2 border-indigo-400">
+                            <div>
+                                <p class="font-semibold text-white">Jane T.</p>
+                                <p class="text-sm text-indigo-400">Full-Time Forex Trader</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Testimonial 2 -->
+                    <div class="p-6 bg-gray-900 rounded-xl shadow-2xl border border-gray-800 hover:shadow-emerald-500/20 transition duration-300">
+                        <p class="text-gray-300 italic mb-4 text-lg">"This isn't just a journal; it's a complete analytical framework. It helped me realize my biggest leak was overtrading short setups."</p>
+                        <div class="flex items-center">
+                            <img src="https://placehold.co/40x40/10b981/ffffff?text=MC" alt="Avatar" class="w-10 h-10 rounded-full mr-3 border-2 border-emerald-400">
+                            <div>
+                                <p class="font-semibold text-white">Mark C.</p>
+                                <p class="text-sm text-emerald-400">Crypto Investor & Analyst</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Testimonial 3 -->
+                    <div class="p-6 bg-gray-900 rounded-xl shadow-2xl border border-gray-800 hover:shadow-indigo-500/20 transition duration-300">
+                        <p class="text-gray-300 italic mb-4 text-lg">"The setup was seamless. I was logging my first trade within five minutes. Highly recommend for any serious trader."</p>
+                        <div class="flex items-center">
+                            <img src="https://placehold.co/40x40/06b6d4/ffffff?text=DA" alt="Avatar" class="w-10 h-10 rounded-full mr-3 border-2 border-cyan-400">
+                            <div>
+                                <p class="font-semibold text-white">David A.</p>
+                                <p class="text-sm text-cyan-400">Options Trading Coach</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final Call to Action (Финальный призыв к действию) -->
+        <section class="py-20 md:py-32 text-center bg-[#10141b]">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 bg-gray-900 p-12 rounded-3xl shadow-2xl shadow-emerald-500/10 border border-gray-800">
+                <h2 class="text-4xl font-extrabold mb-4 text-white">Ready to Trade with Confidence?</h2>
+                <p class="text-xl text-gray-400 mb-8">
+                    Start your journey to consistent profits right now. It's fully functional and **absolutely free**.
+                </p>
+                <!-- Ссылка на вторичный файл журнала -->
+                <a href="journal.html" target="_blank" class="py-4 px-12 text-xl font-bold rounded-full text-[#0d1117] cta-button gradient-bg shadow-2xl transition duration-300 transform hover:scale-105 inline-block">
+                    Launch TradeLog Pro (It's Free!)
+                </a>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer (Футер) -->
+    <footer class="bg-black py-8 border-t border-gray-900">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-500">
+            <p>&copy; 2025 TradeLog Pro. All rights reserved. | <a href="#" class="hover:text-white transition duration-200">Terms of Service</a> | <a href="#" class="hover:text-white transition duration-200">Privacy Policy</a></p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const menuButton = document.getElementById('menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const menuIcon = document.getElementById('menu-icon');
+            const closeIcon = document.getElementById('close-icon');
+            
+            // Получаем все ссылки внутри мобильного меню для автоматического закрытия
+            const mobileLinks = mobileMenu.querySelectorAll('a');
+
+            const toggleMenu = () => {
+                // Переключаем видимость меню
+                mobileMenu.classList.toggle('hidden');
+                // Переключаем иконки: гамбургер <-> крестик
+                menuIcon.classList.toggle('hidden');
+                closeIcon.classList.toggle('hidden');
+            };
+
+            // Прикрепляем обработчик к кнопке меню
+            if (menuButton) {
+                menuButton.addEventListener('click', toggleMenu);
+            }
+
+            // Автоматическое закрытие меню при клике на ссылку
+            mobileLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    // Проверяем, открыто ли меню, прежде чем закрыть
+                    if (!mobileMenu.classList.contains('hidden')) {
+                        toggleMenu();
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

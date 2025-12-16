@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradeLog</title>
+    <!-- Using CDN for single-file development convenience. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Base styles and dark theme */
+        body {
+            background-color: #0f172a; /* slate-900 */
+        }
+        /* Style for scrollable trade list */
+        .scrollable-content {
+            max-height: 70vh; /* Slightly reduced height for better viewing on small screens */
+            overflow-y: auto;
+        }
+        /* Custom scrollbar style for dark theme aesthetics */
+        .scrollable-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scrollable-content::-webkit-scrollbar-thumb {
+            background-color: #475569; /* slate-600 */
+            border-radius: 4px;
+        }
+        .scrollable-content::-webkit-scrollbar-track {
+            background: #1e293b; /* slate-800 */
+        }
+        /* Style for modern table rows */
+        .trade-row:nth-child(even) {
+            background-color: #1e293b; /* primary-bg for alternating rows */
+        }
+        /* Custom input focus style */
+        input:focus, select:focus, textarea:focus {
+            --tw-ring-color: #10b981; /* emerald-500 */
+            border-color: #10b981;
+        }
+    </style>
+</head>
+<body class="font-sans text-white min-h-screen p-4 md:p-8">
+
+    <!-- Application Container -->
+    <div id="app-container" class="max-w-7xl mx-auto">
+        <!-- Loading Indicator (will quickly disappear as there are no external requests) -->
+        <div id="loading-indicator" class="text-center py-20">
+            <svg class="animate-spin h-10 w-10 text-emerald-500 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>Loading local data...</p>
+        </div>
+
+        <div id="main-content" class="hidden">
+            <h1 class="text-4xl font-extrabold mb-2 text-emerald-500">TradeLog Pro</h1>
+            <!-- <p class="text-slate-400 mb-6">Your trades are saved locally in your browser and are accessible only to you.</p> -->
+
+            <!-- Stats Block -->
+            <div id="stats-block" class="bg-secondary-bg p-6 rounded-xl shadow-2xl mb-8 grid grid-cols-2 md:grid-cols-4 gap-4 border border-slate-700">
+                
+                <!-- Total PnL -->
+                <div class="p-3 bg-primary-bg rounded-lg shadow-xl flex items-center space-x-3">
+                    <div class="p-2 rounded-full bg-emerald-600/30 text-emerald-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/><polyline points="12 2 12 20"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-400">Total PnL ($)</p>
+                        <p id="total-pnl" class="text-xl font-extrabold text-white">--</p>
+                    </div>
+                </div>
+
+                <!-- Total Trades Count -->
+                <div class="p-3 bg-primary-bg rounded-lg shadow-xl flex items-center space-x-3">
+                    <div class="p-2 rounded-full bg-cyan-600/30 text-cyan-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-400">Total Trades</p>
+                        <p id="total-trades" class="text-xl font-extrabold text-white">0</p>
+                    </div>
+                </div>
+
+                <!-- Your Trader ID (Local) -->
+                <div class="p-3 bg-primary-bg rounded-lg shadow-xl flex items-center space-x-3">
+                    <div class="p-2 rounded-full bg-indigo-600/30 text-indigo-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-400">Your Trader ID (Local)</p>
+                        <p id="user-name-display" class="text-sm font-bold text-indigo-400 break-all">--</p>
+                    </div>
+                </div>
+                
+                <!-- App ID -->
+                <div class="p-3 bg-primary-bg rounded-lg shadow-xl flex items-center space-x-3">
+                     <div class="p-2 rounded-full bg-slate-600/30 text-slate-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 17.5v-5M12 7.5v1.5"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-sm text-slate-400">App ID</p>
+                        <p id="app-id-display" class="text-xs break-all text-slate-400">--</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Add Trade Form -->
+                <div class="lg:col-span-1">
+                    <div class="bg-secondary-bg p-6 rounded-xl shadow-2xl sticky top-8 border border-slate-700">
+                        <h2 class="text-2xl font-semibold mb-4 text-white">Add New Trade</h2>
+                        <form id="deal-form">
+                            <input type="hidden" id="deal-id">
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="date" class="block text-sm font-medium text-slate-300">Trade Date</label>
+                                    <input type="date" id="date" required class="mt-1 block w-full rounded-md border-slate-600 bg-primary-bg text-white shadow-sm p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label for="symbol" class="block text-sm font-medium text-slate-300">Ticker / Symbol</label>
+                                    <input type="text" id="symbol" required placeholder="AAPL, BTCUSD, EURUSD..." class="mt-1 block w-full rounded-md border-slate-600 bg-primary-bg text-white shadow-sm p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label for="type" class="block text-sm font-medium text-slate-300">Trade Type</label>
+                                    <select id="type" required class="mt-1 block w-full rounded-md border-slate-600 bg-primary-bg text-white shadow-sm p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                                        <option value="Long">Long (Buy)</option>
+                                        <option value="Short">Short (Sell)</option>
+                                    </select>
+                                </div>
+                                <!-- Manual PnL input -->
+                                <div>
+                                    <label for="pnl" class="block text-sm font-medium text-slate-300">Profit / Loss (USD)</label>
+                                    <input type="number" step="0.01" id="pnl" required placeholder="E.g., 50.25 or -12.00" class="mt-1 block w-full rounded-md border-slate-600 bg-primary-bg text-white shadow-sm p-2.5 focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label for="notes" class="block text-sm font-medium text-slate-300">Notes (Optional)</label>
+                                    <textarea id="notes" rows="3" placeholder="Key reasons, lessons learned..." class="mt-1 block w-full rounded-md border-slate-600 bg-primary-bg text-white shadow-sm p-2.5 focus:ring-emerald-500 focus:border-emerald-500"></textarea>
+                                </div>
+                                <button type="submit" id="submit-btn" class="w-full py-3 px-4 bg-emerald-500 text-primary-bg font-bold rounded-lg shadow-lg hover:bg-emerald-400 transition duration-150 transform hover:scale-[1.01]">
+                                    Save Trade
+                                </button>
+                                <button type="button" id="cancel-edit-btn" class="hidden w-full py-2 px-4 mt-2 bg-slate-600 text-white font-bold rounded-lg shadow hover:bg-slate-500 transition duration-150">
+                                    Cancel Editing
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Trade List -->
+                <div class="lg:col-span-2">
+                    <h2 class="text-2xl font-semibold mb-4 text-white">Trade History (Local)</h2>
+                    <div id="deals-list" class="scrollable-content bg-secondary-bg rounded-xl shadow-2xl border border-slate-700">
+                        <table class="min-w-full divide-y divide-slate-700">
+                            <thead class="bg-primary-bg sticky top-0 z-10 shadow-md">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Date</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Symbol</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Type</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider hidden md:table-cell">Notes</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">PnL ($)</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deals-table-body" class="divide-y divide-slate-800">
+                                <!-- Trades will be inserted here by JS -->
+                            </tbody>
+                        </table>
+                        <p id="no-deals-message" class="p-6 text-center text-slate-400 hidden">No trades yet. Add your first trade!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal window for messages/confirmation (unchanged logic) -->
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div id="modal-box" class="bg-secondary-bg p-6 rounded-xl shadow-2xl max-w-sm w-full transform transition-all duration-300 scale-95 opacity-0 border border-slate-600">
+            <h3 id="modal-title" class="text-xl font-bold mb-3 text-white">Message</h3>
+            <p id="modal-text" class="text-slate-300 mb-4"></p>
+            <div class="flex justify-end space-x-2">
+                <button id="modal-cancel-btn" class="hidden py-2 px-4 bg-slate-600 rounded-lg text-white hover:bg-slate-500 transition duration-150">Cancel</button>
+                <button id="modal-confirm-btn" class="py-2 px-4 bg-emerald-500 rounded-lg text-primary-bg font-semibold hover:bg-emerald-400 transition duration-150">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // For Local Storage, we don't need any external imports besides uuid (which is available in modern browsers).
+        
+        // Tailwind Configuration (Modern dark theme)
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-bg': '#1f2937', // slate-800
+                        'secondary-bg': '#374151', // slate-700
+                        'accent': '#10b981', // emerald-500 (Used for positive PnL and actions)
+                        'danger': '#ef4444', // red-500
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+
+        // --- Global Variables and Local Initialization ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        // Keys for Local Storage
+        const TRADES_STORAGE_KEY = `trading_journal_${appId}_local`;
+        const USER_ID_STORAGE_KEY = `trader_id_${appId}_local`;
+
+        let trades = []; // Array to store all trades
+        let userId = null;
+        let userName = null; 
+        
+        // DOM Elements
+        const mainContent = document.getElementById('main-content');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const dealsTableBody = document.getElementById('deals-table-body');
+        const dealForm = document.getElementById('deal-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        const noDealsMessage = document.getElementById('no-deals-message');
+        const totalPnlDisplay = document.getElementById('total-pnl');
+        const totalTradesDisplay = document.getElementById('total-trades');
+        const userNameDisplay = document.getElementById('user-name-display'); 
+        const appIdDisplay = document.getElementById('app-id-display'); 
+
+        // --- Helper Functions ---
+
+        /**
+         * Displays a custom modal window for messages or confirmation.
+         * (Kept as is to avoid using alert/confirm)
+         */
+        function showModal(title, text, isConfirm = false) {
+            return new Promise((resolve) => {
+                const container = document.getElementById('modal-container');
+                const box = document.getElementById('modal-box');
+                const titleEl = document.getElementById('modal-title');
+                const textEl = document.getElementById('modal-text');
+                const confirmBtn = document.getElementById('modal-confirm-btn');
+                const cancelBtn = document.getElementById('modal-cancel-btn');
+
+                titleEl.textContent = title;
+                textEl.textContent = text;
+                container.classList.remove('hidden');
+
+                if (isConfirm) {
+                    cancelBtn.classList.remove('hidden');
+                    confirmBtn.textContent = 'Confirm';
+                } else {
+                    cancelBtn.classList.add('hidden');
+                    confirmBtn.textContent = 'OK';
+                }
+
+                // Fade-in animation
+                setTimeout(() => {
+                    box.classList.remove('scale-95', 'opacity-0');
+                    box.classList.add('scale-100', 'opacity-100');
+                }, 10);
+
+
+                const close = (result) => {
+                    box.classList.remove('scale-100', 'opacity-100');
+                    box.classList.add('scale-95', 'opacity-0');
+                    setTimeout(() => {
+                        container.classList.add('hidden');
+                        confirmBtn.onclick = null;
+                        cancelBtn.onclick = null;
+                        resolve(result);
+                    }, 300); 
+                };
+
+                confirmBtn.onclick = () => close(true);
+                if (isConfirm) {
+                    cancelBtn.onclick = () => close(false);
+                }
+            });
+        }
+
+        // --- Local Storage Functions ---
+
+        /**
+         * Retrieves the array of trades from Local Storage.
+         * @returns {Array} Array of trade objects.
+         */
+        function getLocalTrades() {
+            try {
+                const data = localStorage.getItem(TRADES_STORAGE_KEY);
+                return data ? JSON.parse(data) : [];
+            } catch (error) {
+                console.error("Error reading Local Storage:", error);
+                return [];
+            }
+        }
+
+        /**
+         * Saves the current array of trades to Local Storage.
+         * @param {Array} currentTrades Array to save.
+         */
+        function setLocalTrades(currentTrades) {
+            try {
+                localStorage.setItem(TRADES_STORAGE_KEY, JSON.stringify(currentTrades));
+            } catch (error) {
+                console.error("Error writing to Local Storage:", error);
+                showModal("Error", "Failed to save data to Local Storage. Storage might be full.");
+            }
+        }
+
+        /**
+         * Application initialization: loads user ID and trades.
+         */
+        function initializeApp() {
+            // 1. Get/Set Local User ID (for display)
+            userId = localStorage.getItem(USER_ID_STORAGE_KEY);
+            if (!userId) {
+                // Generate a new unique ID if missing
+                userId = crypto.randomUUID(); 
+                localStorage.setItem(USER_ID_STORAGE_KEY, userId);
+            }
+            // Generate a simple display name
+            userName = 'Trader-' + userId.substring(0, 8); 
+
+            // 2. Update UI with IDs
+            userNameDisplay.textContent = userName;
+            appIdDisplay.textContent = appId;
+            
+            // 3. Load and render data
+            loadAndRenderDeals();
+
+            // 4. Show main content
+            mainContent.classList.remove('hidden');
+            loadingIndicator.classList.add('hidden');
+        }
+
+        // --- CRUD Operations (Local) ---
+
+        /**
+         * Loads trades from Local Storage, sorts them, and triggers rendering.
+         */
+        function loadAndRenderDeals() {
+            trades = getLocalTrades();
+            
+            // Sort by date (newest first). For local storage, we do this manually.
+            trades.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            renderDeals(trades);
+            updateStats(trades);
+        }
+        
+        /**
+         * Saves or updates a trade.
+         */
+        async function saveDeal(e) {
+            e.preventDefault();
+
+            const dealId = document.getElementById('deal-id').value;
+            const date = document.getElementById('date').value;
+            const symbol = document.getElementById('symbol').value.toUpperCase().trim();
+            const type = document.getElementById('type').value;
+            const pnlInput = document.getElementById('pnl').value;
+            const notes = document.getElementById('notes').value;
+            
+            const pnlValue = parseFloat(pnlInput);
+
+            if (isNaN(pnlValue)) {
+                 showModal("Input Error", "Please enter a valid number for Profit / Loss.");
+                 return;
+            }
+            
+            // Create the new trade object
+            const dealData = {
+                id: dealId || crypto.randomUUID(), // Use existing ID or generate a new one
+                date: date,
+                symbol: symbol,
+                type: type,
+                pnl: parseFloat(pnlValue.toFixed(2)), 
+                notes: notes,
+                traderId: userId,    
+                userName: userName, 
+                timestamp: Date.now() // Use timestamp for new trade
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = dealId ? "Updating..." : "Saving Trade...";
+
+            try {
+                if (dealId) {
+                    // Update: find index and replace
+                    const index = trades.findIndex(d => d.id === dealId);
+                    if (index !== -1) {
+                        trades[index] = dealData;
+                        showModal("Success", "Trade successfully updated!");
+                    }
+                } else {
+                    // Create: add new trade
+                    trades.push(dealData);
+                    showModal("Success", "Trade successfully added!");
+                }
+                
+                setLocalTrades(trades); // Save to Local Storage
+                loadAndRenderDeals();   // Reload and render
+                resetForm();
+
+            } catch (error) {
+                console.error("Error saving trade:", error);
+                showModal("Error", "Failed to save trade: " + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Save Trade";
+            }
+        }
+        
+        /** Resets the form and button states. */
+        function resetForm() {
+            dealForm.reset();
+            document.getElementById('deal-id').value = '';
+            submitBtn.textContent = "Save Trade";
+            cancelEditBtn.classList.add('hidden');
+        }
+
+        /**
+         * Deletes a trade.
+         * @param {string} id Local ID of the trade.
+         */
+        async function deleteDeal(id) {
+            // Since this is a local journal, deletion is allowed
+            
+            const confirmed = await showModal("Confirmation", "Are you sure you want to delete this trade?", true);
+            if (!confirmed) return;
+
+            try {
+                // Filter the array, removing the trade
+                trades = trades.filter(d => d.id !== id);
+                setLocalTrades(trades); // Save to Local Storage
+                loadAndRenderDeals();   // Reload and render
+                showModal("Success", "Trade successfully deleted.");
+            } catch (error) {
+                console.error("Error deleting trade:", error);
+                showModal("Error", "Failed to delete trade.");
+            }
+        }
+
+        /**
+         * Fills the form with trade data for editing.
+         * @param {string} id Local ID of the trade.
+         * @param {Object} deal Trade data.
+         */
+        function editDeal(id, deal) {
+            
+            document.getElementById('deal-id').value = id;
+            document.getElementById('date').value = deal.date || '';
+            document.getElementById('symbol').value = deal.symbol || '';
+            document.getElementById('type').value = deal.type || 'Long';
+            document.getElementById('pnl').value = deal.pnl;
+            document.getElementById('notes').value = deal.notes || '';
+
+            submitBtn.textContent = "Update Trade";
+            cancelEditBtn.classList.remove('hidden');
+
+            // Scroll to the form for better UX
+            document.getElementById('deal-form').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // --- Rendering and Stats ---
+
+        /**
+         * Updates the stats block.
+         */
+        function updateStats(deals) {
+            const totalTrades = deals.length;
+            // Calculate total PnL
+            const totalPnL = deals.reduce((sum, deal) => sum + (deal.pnl || 0), 0);
+            
+            totalTradesDisplay.textContent = totalTrades.toString();
+            const formattedPnL = totalPnL.toFixed(2);
+            totalPnlDisplay.textContent = `${formattedPnL}`;
+            
+            // Color indicator for PnL
+            totalPnlDisplay.classList.remove('text-accent', 'text-danger', 'text-white');
+            if (totalPnL > 0) {
+                totalPnlDisplay.classList.add('text-accent'); // Emerald for profit
+            } else if (totalPnL < 0) {
+                totalPnlDisplay.classList.add('text-danger'); // Red for loss
+            } else {
+                totalPnlDisplay.classList.add('text-white');
+            }
+        }
+
+
+        /**
+         * Renders the list of trades in the table.
+         */
+        function renderDeals(deals) {
+            dealsTableBody.innerHTML = '';
+            
+            if (deals.length === 0) {
+                noDealsMessage.classList.remove('hidden');
+                return;
+            }
+            noDealsMessage.classList.add('hidden');
+
+            deals.forEach(deal => {
+                const pnlClass = deal.pnl > 0 ? 'text-accent' : (deal.pnl < 0 ? 'text-danger' : 'text-slate-300');
+                const row = dealsTableBody.insertRow();
+                row.className = 'trade-row hover:bg-slate-700 transition duration-100';
+
+                // 0. Date
+                row.insertCell().textContent = deal.date;
+                row.cells[0].className = 'px-4 py-3 text-sm font-medium text-slate-200';
+
+                // 1. Symbol
+                row.insertCell().textContent = deal.symbol;
+                row.cells[1].className = 'px-4 py-3 text-sm font-semibold text-white';
+
+                // 2. Type
+                row.insertCell().textContent = deal.type === 'Long' ? 'Long' : 'Short';
+                row.cells[2].className = `px-4 py-3 text-sm font-semibold ${deal.type === 'Long' ? 'text-green-400' : 'text-yellow-400'}`;
+
+                // 3. Notes (Hidden on small screens)
+                row.insertCell().textContent = deal.notes || '—';
+                row.cells[3].className = 'px-4 py-3 text-xs text-slate-400 truncate max-w-xs hidden md:table-cell';
+
+                // 4. PnL
+                row.insertCell().textContent = `${deal.pnl.toFixed(2)} $`;
+                row.cells[4].className = `px-4 py-3 text-sm font-bold text-right ${pnlClass}`;
+
+                // 5. Actions
+                const actionsCell = row.insertCell();
+                actionsCell.className = 'px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-2';
+                
+                // In local mode, all trades can be edited/deleted
+                actionsCell.innerHTML = `
+                    <button class="text-accent hover:text-emerald-400 transition duration-150 edit-btn" data-id="${deal.id}" title="Edit trade">
+                        Edit
+                    </button>
+                    <button class="text-danger hover:text-red-300 transition duration-150 delete-btn" data-id="${deal.id}" title="Delete trade">
+                        Delete
+                    </button>
+                `;
+                // Attach listeners
+                actionsCell.querySelector('.edit-btn').addEventListener('click', () => editDeal(deal.id, deal));
+                actionsCell.querySelector('.delete-btn').addEventListener('click', (e) => {
+                    const id = e.target.getAttribute('data-id');
+                    deleteDeal(id);
+                });
+            });
+        }
+
+
+        // --- Event Listeners ---
+
+        dealForm.addEventListener('submit', saveDeal);
+        cancelEditBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            resetForm();
+        });
+
+
+        // --- App Startup ---
+        initializeApp();
+
+    </script>
+</body>
+</html>
