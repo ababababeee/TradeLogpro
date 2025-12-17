@@ -80,12 +80,7 @@
             // 1. Load data from localStorage
             loadDealsFromLocalStorage();
             
-            // 2. Update status
-            document.getElementById('auth-status').textContent = "";
-            document.getElementById('auth-status').classList.remove('bg-yellow-100', 'text-yellow-800');
-            document.getElementById('auth-status').classList.add('bg-blue-100', 'text-blue-800');
-
-            // 3. Render
+            // 2. Render
             renderCalendar();
             displayDealsForSelectedDate();
         };
@@ -153,16 +148,25 @@
 
                 dayElement.appendChild(dayNumber);
 
-                // Add trade marker
+                // Add trade marker (Simple PnL indicator for calendar view could be added here later)
                 if (dealsData[dateStr] && dealsData[dateStr].length > 0) {
                     const dealCount = dealsData[dateStr].length;
+                    
+                    // Calculate quick daily PnL for dot color
+                    let dayPnL = 0;
+                    dealsData[dateStr].forEach(d => {
+                        if (d.type === 'profit') dayPnL += parseFloat(d.amount);
+                        else dayPnL -= parseFloat(d.amount);
+                    });
+
                     const marker = document.createElement('div');
-                    marker.className = 'w-2 h-2 rounded-full bg-red-500 absolute bottom-1 right-1';
-                    marker.title = `${dealCount} trades`;
+                    marker.className = `w-2 h-2 rounded-full absolute bottom-1 right-1 ${dayPnL >= 0 ? 'bg-green-500' : 'bg-red-500'}`;
+                    marker.title = `${dealCount} trades. PnL: ${dayPnL.toFixed(2)}`;
                     dayElement.appendChild(marker);
 
                     if (dateStr === selectedDateStr) {
-                        marker.classList.replace('bg-red-500', 'bg-yellow-300'); // Different marker color for selected day
+                        marker.classList.replace('bg-green-500', 'bg-yellow-300'); 
+                        marker.classList.replace('bg-red-500', 'bg-yellow-300'); 
                     }
                 }
 
@@ -274,10 +278,44 @@
             document.getElementById('selected-date-display').textContent = `Selected Date: ${selectedDate.toLocaleDateString('en-US')}`;
 
             let html = '';
+
+            // --- PnL CALCULATION START ---
+            let dailyPnL = 0;
+            let totalTrades = deals.length;
+            
+            if (deals.length > 0) {
+                deals.forEach(deal => {
+                    const amount = parseFloat(deal.amount) || 0;
+                    if (deal.type === 'profit') {
+                        dailyPnL += amount;
+                    } else {
+                        dailyPnL -= amount;
+                    }
+                });
+            }
+
+            const pnlColorClass = dailyPnL >= 0 ? 'text-green-600' : 'text-red-600';
+            const pnlSign = dailyPnL > 0 ? '+' : '';
+            
+            // Add PnL Summary Card
+            html += `
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-4 flex justify-between items-center">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase font-semibold">Daily Net PnL</p>
+                        <p class="text-2xl font-bold ${pnlColorClass}">${pnlSign}${dailyPnL.toFixed(2)}</p>
+                    </div>
+                    <div class="text-right">
+                         <p class="text-xs text-gray-500 uppercase font-semibold">Trades</p>
+                         <p class="text-lg font-medium text-gray-800">${totalTrades}</p>
+                    </div>
+                </div>
+            `;
+            // --- PnL CALCULATION END ---
+
             if (deals.length === 0) {
-                html = '<p class="text-gray-500 italic">No trades recorded for this day.</p>';
+                html += '<p class="text-gray-500 italic">No trades recorded for this day.</p>';
             } else {
-                html = '<ul class="space-y-3">';
+                html += '<ul class="space-y-3">';
                 // Sort by time (newest first)
                 deals.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
@@ -473,9 +511,7 @@
 
     <header class="mb-6">
         <h1 class="text-3xl font-extrabold text-gray-900 mb-2">Tradelogpro</h1>
-        <div id="auth-status" class="inline-block px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-            Data is saved locally in your browser.
-        </div>
+        <!-- Auth status removed -->
     </header>
 
     <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
