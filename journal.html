@@ -1,627 +1,735 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tradelogpro - Trading Calendar</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // --- CONSTANTS AND SETTINGS ---
-        
-        // Constants for English display
-        const MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        const DAYS_OF_WEEK_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tradelogpro - Professional Trading Journal</title>
 
-        // Key for storing data in localStorage
-        const STORAGE_KEY = 'tradingCalendarLocalDeals';
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+tailwind.config = {
+darkMode: 'class',
+theme: {
+extend: {
+colors: {
+darkBg: '#1a1b1e',
+darkCard: '#25262b',
+darkText: '#c1c2c5',
+darkBorder: '#373a40'
+}
+}
+}
+}
+</script>
+<script>
+// --- CONSTANTS AND SETTINGS ---
 
-        let selectedDate = new Date();
-        let currentYear = selectedDate.getFullYear();
-        let currentMonth = selectedDate.getMonth();
-        // Deals cache: { 'YYYY-MM-DD': [{id, description, date, timestamp, ...}] }
-        let dealsData = {}; 
-        let isAuthReady = true; // Always ready, since there is no authentication
-        let editingDealId = null; // ID of the deal being edited
+const MONTHS_RU = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DAYS_OF_WEEK_RU = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+// Storage keys
+const STORAGE_KEY = 'tradelogProData_v2';
+const OLD_STORAGE_KEY = 'tradingCalendarLocalDeals'; 
+const THEME_KEY = 'tradelogProTheme';
+let selectedDate = new Date();
+let currentYear = selectedDate.getFullYear();
+let currentMonth = selectedDate.getMonth();
 
-        // --- UTILITIES ---
+// Data Structure: { 'YYYY-MM-DD': [ {id, instrument, amount, type, ...} ] }
+let dealsData = {};
+let editingDealId = null;
+// Chart variables
+let equityChartInstance = null;
+let winrateChartInstance = null;
 
-        // Formats date to 'YYYY-MM-DD' string
-        const formatDate = (date) => {
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        };
+// --- UTILS ---
+const formatDate = (date) => {
+const y = date.getFullYear();
+const m = String(date.getMonth() + 1).padStart(2, '0');
+const d = String(date.getDate()).padStart(2, '0');
+return `${y}-${m}-${d}`;
+};
+const generateId = () => crypto.randomUUID();
 
-        // --- LOCAL STORAGE ---
+// --- STORAGE & THEME ---
+const loadData = () => {
+const stored = localStorage.getItem(STORAGE_KEY);
+if (stored) {
+try {
+dealsData = JSON.parse(stored);
+} catch (e) {
+console.error("Data load error", e);
+dealsData = {};
+}
+}
+};
 
-        // Load data from localStorage
-        const loadDealsFromLocalStorage = () => {
-            const storedData = localStorage.getItem(STORAGE_KEY);
-            if (storedData) {
-                try {
-                    // Parsing the saved array
-                    const dealsArray = JSON.parse(storedData);
+const migrateOldData = () => {
+const oldData = localStorage.getItem(OLD_STORAGE_KEY);
+if (oldData) {
+try {
+const parsedOld = JSON.parse(oldData);
+let restoredCount = 0;
+if (Array.isArray(parsedOld)) {
+parsedOld.forEach(oldDeal => {
+const date = oldDeal.date;
+if (!dealsData[date]) dealsData[date] = [];
+const exists = dealsData[date].some(d => d.id === oldDeal.id || (d.amount == oldDeal.amount && d.description === oldDeal.description));
 
-                    // Transforming the array into the dealsData cache: { 'YYYY-MM-DD': [...] }
-                    dealsData = dealsArray.reduce((acc, deal) => {
-                        if (!acc[deal.date]) {
-                            acc[deal.date] = [];
-                        }
-                        // Storing id as string, timestamp as ISO string for localStorage.
-                        acc[deal.date].push(deal);
-                        return acc;
-                    }, {});
+if (!exists) {
+dealsData[date].push({
+...oldDeal,
+id: oldDeal.id || generateId(),
+type: oldDeal.type || 'profit',
+direction: oldDeal.direction || 'long',
+timestamp: oldDeal.timestamp || new Date().toISOString()
+});
+restoredCount++;
+}
+});
+}
+if (restoredCount > 0) {
+saveData();
+showTemporaryMessage(`Restored ${restoredCount} trades from old version!`, 'green');
+}
+} catch (e) {
+console.error("Migration error", e);
+}
+}
+};
 
-                    console.log(`Loaded ${dealsArray.length} trades from localStorage.`);
-                } catch (e) {
-                    console.error("Error parsing saved data:", e);
-                    dealsData = {};
-                }
-            }
-        };
+const saveData = () => {
+localStorage.setItem(STORAGE_KEY, JSON.stringify(dealsData));
+updateAnalytics();
+};
 
-        // Save data to localStorage
-        const saveDealsToLocalStorage = () => {
-            // Flatten dealsData back into a single array for saving
-            const dealsArray = Object.values(dealsData).flat();
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(dealsArray));
-            } catch (e) {
-                console.error("Error saving data to localStorage:", e);
-                showTemporaryMessage('Error: Could not save data to browser (localStorage).', 'red');
-            }
-        };
+const initTheme = () => {
+const savedTheme = localStorage.getItem(THEME_KEY);
+const html = document.documentElement;
+if (savedTheme === 'dark') {
+html.classList.add('dark');
+} else {
+html.classList.remove('dark');
+}
+};
 
-        // --- APPLICATION INITIALIZATION ---
+const toggleTheme = () => {
+const html = document.documentElement;
+html.classList.toggle('dark');
+const isDark = html.classList.contains('dark');
+localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+updateAnalytics();
+};
 
-        const initApp = () => {
-            // 1. Load data from localStorage
-            loadDealsFromLocalStorage();
-            
-            // 2. Render
-            renderCalendar();
-            displayDealsForSelectedDate();
-        };
+// --- BUSINESS LOGIC ---
+const calculateRR = () => {
+const risk = parseFloat(document.getElementById('deal-risk').value) || 0;
+const reward = parseFloat(document.getElementById('deal-reward').value) || 0;
+const rrDisplay = document.getElementById('rr-display');
 
+if (risk > 0 && reward > 0) {
+const ratio = (reward / risk).toFixed(1);
+rrDisplay.textContent = `1:${ratio}`;
+rrDisplay.className = ratio >= 2 ? 'text-green-500 font-bold ml-2' : 'text-yellow-500 font-bold ml-2';
+} else {
+rrDisplay.textContent = '-';
+rrDisplay.className = 'text-gray-400 ml-2';
+}
+};
 
-        // --- CALENDAR LOGIC ---
+// --- EXPORT / IMPORT ---
+const exportToCSV = () => {
+const allDeals = Object.values(dealsData).flat();
+if (allDeals.length === 0) {
+showTemporaryMessage('No data to export', 'red');
+return;
+}
+let csvContent = "data:text/csv;charset=utf-8,";
+csvContent += "Date,Time,Instrument,Type,Direction,Amount,Risk,Reward,Strategy,Emotion,Description,Screenshot\n";
+allDeals.forEach(deal => {
+const dateObj = new Date(deal.timestamp);
+const date = deal.date;
+const time = dateObj.toLocaleTimeString();
+const desc = deal.description ? `"${deal.description.replace(/"/g, '""')}"` : "";
 
-        const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
-        const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay(); // 0 (Sun) - 6 (Sat)
+const row = [
+date, time, deal.instrument, deal.type, deal.direction,
+deal.amount, deal.risk || 0, deal.reward || 0,
+deal.strategy || "", deal.emotion || "", desc, deal.screenshot || ""
+].join(",");
+csvContent += row + "\n";
+});
+const encodedUri = encodeURI(csvContent);
+const link = document.createElement("a");
+link.setAttribute("href", encodedUri);
+link.setAttribute("download", `tradelog_export_${formatDate(new Date())}.csv`);
+document.body.appendChild(link);
+link.click();
+document.body.removeChild(link);
+};
 
-        const renderCalendar = () => {
-            const calendarGrid = document.getElementById('calendar-grid');
-            const monthTitle = document.getElementById('current-month-year');
-            calendarGrid.innerHTML = '';
+const importBackup = (event) => {
+const file = event.target.files[0];
+if (!file) return;
+const reader = new FileReader();
+reader.onload = (e) => {
+try {
+const content = e.target.result;
+const parsed = JSON.parse(content);
+if (confirm(`Records found. This will overwrite current data. Continue?`)) {
+dealsData = parsed;
+saveData();
+initApp();
+showTemporaryMessage('Data successfully imported!', 'green');
+}
+} catch (err) {
+showTemporaryMessage('Error: .json file required', 'red');
+}
+};
+reader.readAsText(file);
+};
 
-            monthTitle.textContent = `${MONTHS_EN[currentMonth]} ${currentYear}`;
+const exportBackupJSON = () => {
+const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dealsData));
+const downloadAnchorNode = document.createElement('a');
+downloadAnchorNode.setAttribute("href", dataStr);
+downloadAnchorNode.setAttribute("download", "tradelog_backup.json");
+document.body.appendChild(downloadAnchorNode);
+downloadAnchorNode.click();
+downloadAnchorNode.remove();
+}
 
-            const daysInMonth = getDaysInMonth(currentYear, currentMonth);
-            // JS getDay() returns 0 for Sunday. We need Monday to be 0 for the grid structure.
-            let firstDayIndex = (getFirstDayOfMonth(currentYear, currentMonth) + 6) % 7;
+// --- ANALYTICS ---
+const updateAnalytics = () => {
+const allDeals = Object.values(dealsData).flat().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-            // 1. Add day names (Mon, Tue, ...)
-            DAYS_OF_WEEK_EN.forEach(day => {
-                const dayName = document.createElement('div');
-                dayName.className = 'text-center font-bold text-sm text-gray-700 p-1';
-                dayName.textContent = day;
-                calendarGrid.appendChild(dayName);
-            });
+const labels = [];
+const dataPoints = [];
+let cumulative = 0;
+let winCount = 0;
+let lossCount = 0;
+allDeals.forEach(deal => {
+const val = parseFloat(deal.amount);
+if (deal.type === 'profit') {
+cumulative += val;
+winCount++;
+} else {
+cumulative -= val;
+lossCount++;
+}
+const dateShort = deal.date.substring(5); // MM-DD
+labels.push(dateShort);
+dataPoints.push(cumulative);
+});
+const isDark = document.documentElement.classList.contains('dark');
+const gridColor = isDark ? '#373a40' : '#e5e7eb';
+const textColor = isDark ? '#c1c2c5' : '#4b5563';
+const ctxEquity = document.getElementById('equityChart').getContext('2d');
+if (equityChartInstance) equityChartInstance.destroy();
+equityChartInstance = new Chart(ctxEquity, {
+type: 'line',
+data: {
+labels: labels,
+datasets: [{
+label: 'Equity ($)',
+data: dataPoints,
+borderColor: '#8b5cf6',
+backgroundColor: 'rgba(139, 92, 246, 0.1)',
+borderWidth: 2,
+fill: true,
+tension: 0.1,
+pointRadius: 2
+}]
+},
+options: {
+responsive: true,
+maintainAspectRatio: false,
+scales: {
+x: { grid: { color: 'transparent' }, ticks: { color: textColor } },
+y: { grid: { color: gridColor }, ticks: { color: textColor } }
+},
+plugins: { legend: { display: false } }
+}
+});
+const ctxWinrate = document.getElementById('winrateChart').getContext('2d');
+if (winrateChartInstance) winrateChartInstance.destroy();
+const total = winCount + lossCount;
+const winRate = total === 0 ? 0 : Math.round((winCount / total) * 100);
+document.getElementById('winrate-text').textContent = `${winRate}%`;
+winrateChartInstance = new Chart(ctxWinrate, {
+type: 'doughnut',
+data: {
+labels: ['Profit', 'Loss'],
+datasets: [{
+data: [winCount, lossCount],
+backgroundColor: ['#10B981', '#EF4444'],
+borderWidth: 0,
+hoverOffset: 4
+}]
+},
+options: {
+responsive: true,
+cutout: '70%',
+plugins: {
+legend: { position: 'bottom', labels: { color: textColor } }
+}
+}
+});
+};
 
-            // 2. Add padding for days of the previous month
-            for (let i = 0; i < firstDayIndex; i++) {
-                const paddingDay = document.createElement('div');
-                paddingDay.className = 'p-2 text-center text-sm bg-gray-50';
-                calendarGrid.appendChild(paddingDay);
-            }
+// --- INTERFACE & RENDERING ---
+const initApp = () => {
+loadData();
+migrateOldData();
+renderCalendar();
+displayDealsForSelectedDate();
+updateAnalytics();
+};
 
-            // 3. Add days of the current month
-            const todayStr = formatDate(new Date());
-            const selectedDateStr = formatDate(selectedDate);
+const renderCalendar = () => {
+const calendarGrid = document.getElementById('calendar-grid');
+const monthTitle = document.getElementById('current-month-year');
+calendarGrid.innerHTML = '';
+monthTitle.textContent = `${MONTHS_RU[currentMonth]} ${currentYear}`;
+const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+let firstDayIndex = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
+DAYS_OF_WEEK_RU.forEach(day => {
+const dayName = document.createElement('div');
+dayName.className = 'text-center font-bold text-xs text-gray-500 dark:text-gray-400 p-1 uppercase';
+dayName.textContent = day;
+calendarGrid.appendChild(dayName);
+});
+for (let i = 0; i < firstDayIndex; i++) {
+const paddingDay = document.createElement('div');
+paddingDay.className = 'p-2 bg-transparent';
+calendarGrid.appendChild(paddingDay);
+}
+const todayStr = formatDate(new Date());
+const selectedDateStr = formatDate(selectedDate);
+for (let day = 1; day <= daysInMonth; day++) {
+const date = new Date(currentYear, currentMonth, day);
+const dateStr = formatDate(date);
+const dayDeals = dealsData[dateStr] || [];
+let dayPnL = 0;
+dayDeals.forEach(d => {
+dayPnL += d.type === 'profit' ? parseFloat(d.amount) : -parseFloat(d.amount);
+});
+const dayElement = document.createElement('div');
 
-            for (let day = 1; day <= daysInMonth; day++) {
-                const date = new Date(currentYear, currentMonth, day);
-                const dateStr = formatDate(date);
+let bgClass = 'bg-white dark:bg-darkCard hover:bg-gray-50 dark:hover:bg-gray-700';
+let textClass = 'text-gray-700 dark:text-gray-300';
+let borderClass = 'border border-gray-100 dark:border-darkBorder';
+if (dayDeals.length > 0) {
+if (dayPnL > 0) {
+bgClass = 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900';
+textClass = 'text-green-800 dark:text-green-400 font-medium';
+} else if (dayPnL < 0) {
+bgClass = 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900';
+textClass = 'text-red-800 dark:text-red-400 font-medium';
+}
+}
+if (dateStr === selectedDateStr) {
+bgClass = 'bg-purple-600 dark:bg-purple-600 !border-purple-600 shadow-md ring-2 ring-purple-300 dark:ring-purple-900';
+textClass = 'text-white font-bold';
+} else if (dateStr === todayStr) {
+borderClass = 'border-2 border-blue-400 dark:border-blue-500';
+}
+dayElement.className = `p-1 h-20 md:h-24 rounded-xl cursor-pointer transition-all duration-200 flex flex-col justify-between items-start ${bgClass} ${textClass} ${borderClass}`;
 
-                const dayElement = document.createElement('div');
-                dayElement.className = 'p-2 text-center text-sm rounded-lg cursor-pointer transition duration-150 ease-in-out relative flex flex-col items-center justify-center h-16';
+const numSpan = document.createElement('span');
+numSpan.textContent = day;
+numSpan.className = 'text-sm p-1 ml-1';
+dayElement.appendChild(numSpan);
+if (dayDeals.length > 0) {
+const pnlDiv = document.createElement('div');
+pnlDiv.className = 'w-full text-center text-xs md:text-sm truncate px-1';
+pnlDiv.textContent = (dayPnL > 0 ? '+' : '') + dayPnL.toFixed(0);
+if (dateStr !== selectedDateStr) {
+pnlDiv.classList.add(dayPnL >= 0 ? 'text-green-600' : 'text-red-600', 'dark:text-current');
+}
+dayElement.appendChild(pnlDiv);
+}
+dayElement.onclick = () => selectDate(date);
+calendarGrid.appendChild(dayElement);
+}
+};
 
-                // Style for today
-                if (dateStr === todayStr) {
-                    dayElement.classList.add('bg-blue-200', 'font-bold', 'hover:bg-blue-300', 'ring-2', 'ring-blue-500');
-                } else {
-                    dayElement.classList.add('bg-white', 'hover:bg-gray-100');
-                }
+const navigateMonth = (direction) => {
+currentMonth += direction;
+if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+else if (currentMonth > 11) { currentMonth = 0; currentYear++; }
 
-                // Style for the selected day
-                if (dateStr === selectedDateStr) {
-                    dayElement.classList.remove('bg-blue-200', 'hover:bg-blue-300', 'ring-2', 'ring-blue-500');
-                    dayElement.classList.add('bg-purple-500', 'text-white', 'font-bold', 'hover:bg-purple-600', 'shadow-lg');
-                }
+const daysInNewMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+let newDay = selectedDate.getDate();
+if (newDay > daysInNewMonth) newDay = daysInNewMonth;
 
-                // Day number
-                const dayNumber = document.createElement('span');
-                dayNumber.textContent = day;
-                dayNumber.className = 'text-lg';
+selectDate(new Date(currentYear, currentMonth, newDay));
+};
 
-                dayElement.appendChild(dayNumber);
+const selectDate = (date) => {
+selectedDate = date;
+currentYear = date.getFullYear();
+currentMonth = date.getMonth();
+renderCalendar();
+displayDealsForSelectedDate();
+resetForm();
+};
 
-                // Add trade marker (Simple PnL indicator for calendar view could be added here later)
-                if (dealsData[dateStr] && dealsData[dateStr].length > 0) {
-                    const dealCount = dealsData[dateStr].length;
-                    
-                    // Calculate quick daily PnL for dot color
-                    let dayPnL = 0;
-                    dealsData[dateStr].forEach(d => {
-                        if (d.type === 'profit') dayPnL += parseFloat(d.amount);
-                        else dayPnL -= parseFloat(d.amount);
-                    });
+// --- FORM & LIST ---
+const resetForm = () => {
+document.getElementById('deal-instrument').value = '';
+document.getElementById('deal-amount').value = '';
+document.getElementById('deal-description').value = '';
+document.getElementById('deal-risk').value = '';
+document.getElementById('deal-reward').value = '';
+document.getElementById('deal-screenshot').value = '';
+document.getElementById('deal-strategy').value = '';
+document.getElementById('deal-emotion').value = '';
 
-                    const marker = document.createElement('div');
-                    marker.className = `w-2 h-2 rounded-full absolute bottom-1 right-1 ${dayPnL >= 0 ? 'bg-green-500' : 'bg-red-500'}`;
-                    marker.title = `${dealCount} trades. PnL: ${dayPnL.toFixed(2)}`;
-                    dayElement.appendChild(marker);
+document.getElementById('rr-display').textContent = '-';
 
-                    if (dateStr === selectedDateStr) {
-                        marker.classList.replace('bg-green-500', 'bg-yellow-300'); 
-                        marker.classList.replace('bg-red-500', 'bg-yellow-300'); 
-                    }
-                }
+document.querySelector('input[name="deal-type"][value="profit"]').checked = true;
+document.querySelector('input[name="deal-direction"][value="long"]').checked = true;
+editingDealId = null;
+document.getElementById('save-deal-btn').textContent = 'Save Trade';
+document.getElementById('cancel-edit-btn').classList.add('hidden');
+};
 
-                dayElement.onclick = () => selectDate(date);
+window.startEditDeal = (deal) => {
+editingDealId = deal.id;
+document.getElementById('save-deal-btn').textContent = 'Update Trade';
+document.getElementById('cancel-edit-btn').classList.remove('hidden');
+document.getElementById('deal-instrument').value = deal.instrument;
+document.getElementById('deal-amount').value = deal.amount;
+document.getElementById('deal-description').value = deal.description || '';
+document.getElementById('deal-risk').value = deal.risk || '';
+document.getElementById('deal-reward').value = deal.reward || '';
+document.getElementById('deal-screenshot').value = deal.screenshot || '';
+document.getElementById('deal-strategy').value = deal.strategy || '';
+document.getElementById('deal-emotion').value = deal.emotion || '';
+try {
+document.querySelector(`input[name="deal-type"][value="${deal.type}"]`).checked = true;
+document.querySelector(`input[name="deal-direction"][value="${deal.direction}"]`).checked = true;
+} catch(e) {}
+calculateRR();
+document.getElementById('deal-form-card').scrollIntoView({ behavior: 'smooth' });
+};
 
-                calendarGrid.appendChild(dayElement);
-            }
-        };
+window.deleteDeal = (dealId) => {
+const dateStr = formatDate(selectedDate);
+if (confirm('Delete this trade?')) {
+dealsData[dateStr] = dealsData[dateStr].filter(d => d.id !== dealId);
+if (dealsData[dateStr].length === 0) delete dealsData[dateStr];
+saveData();
+renderCalendar();
+displayDealsForSelectedDate();
+}
+};
 
-        const navigateMonth = (direction) => {
-            currentMonth += direction;
-            if (currentMonth < 0) {
-                currentMonth = 11;
-                currentYear--;
-            } else if (currentMonth > 11) {
-                currentMonth = 0;
-                currentYear++;
-            }
-            
-            const newDate = new Date(currentYear, currentMonth, 1);
-            const daysInNewMonth = getDaysInMonth(currentYear, currentMonth);
-            if (selectedDate.getDate() > daysInNewMonth) {
-                newDate.setDate(daysInNewMonth);
-            } else {
-                newDate.setDate(selectedDate.getDate());
-            }
-            selectDate(newDate);
-        };
+const saveDeal = () => {
+const instrument = document.getElementById('deal-instrument').value.trim();
+const amount = parseFloat(document.getElementById('deal-amount').value);
 
-        const selectDate = (date) => {
-            selectedDate = date;
-            currentYear = date.getFullYear();
-            currentMonth = date.getMonth();
-            renderCalendar();
-            displayDealsForSelectedDate();
-            resetForm(); // Reset form when date changes
-        };
+if (!instrument || isNaN(amount) || amount < 0) {
+showTemporaryMessage('Fill Ticker and Amount (number > 0)', 'red');
+return;
+}
+const dealData = {
+instrument,
+amount,
+type: document.querySelector('input[name="deal-type"]:checked').value,
+direction: document.querySelector('input[name="deal-direction"]:checked').value,
+description: document.getElementById('deal-description').value.trim(),
+risk: parseFloat(document.getElementById('deal-risk').value) || 0,
+reward: parseFloat(document.getElementById('deal-reward').value) || 0,
+screenshot: document.getElementById('deal-screenshot').value.trim(),
+strategy: document.getElementById('deal-strategy').value,
+emotion: document.getElementById('deal-emotion').value,
+date: formatDate(selectedDate)
+};
+const dateStr = dealData.date;
+if (editingDealId) {
+const idx = dealsData[dateStr].findIndex(d => d.id === editingDealId);
+if (idx !== -1) {
+dealsData[dateStr][idx] = { ...dealsData[dateStr][idx], ...dealData };
+showTemporaryMessage('Trade updated!', 'green');
+}
+} else {
+if (!dealsData[dateStr]) dealsData[dateStr] = [];
+dealsData[dateStr].push({ ...dealData, id: generateId(), timestamp: new Date().toISOString() });
+showTemporaryMessage('Trade added!', 'green');
+}
+saveData();
+renderCalendar();
+displayDealsForSelectedDate();
+resetForm();
+};
 
-        // --- TRADES LOGIC (CRUD) ---
-        
-        // Reset form
-        const resetForm = () => {
-            document.getElementById('deal-instrument').value = '';
-            document.getElementById('deal-amount').value = '';
-            document.getElementById('deal-description').value = '';
-            document.querySelector('input[name="deal-type"][value="profit"]').checked = true;
-            document.querySelector('input[name="deal-direction"][value="long"]').checked = true;
+const displayDealsForSelectedDate = () => {
+const listEl = document.getElementById('deal-list');
+const dateStr = formatDate(selectedDate);
+const deals = dealsData[dateStr] || [];
 
-            editingDealId = null;
-            document.getElementById('save-deal-btn').textContent = 'Save Trade';
-            document.getElementById('cancel-edit-btn').classList.add('hidden');
-        }
+document.getElementById('selected-date-display').textContent = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+let html = '';
+let dailyPnL = 0;
+if (deals.length > 0) {
+deals.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        // Load trade into form for editing
-        window.startEditDeal = (deal) => {
-            // 1. Set editing state
-            editingDealId = deal.id;
-            document.getElementById('save-deal-btn').textContent = 'Update Trade';
-            document.getElementById('cancel-edit-btn').classList.remove('hidden');
+deals.forEach(deal => {
+const isProfit = deal.type === 'profit';
+const amountVal = parseFloat(deal.amount);
+dailyPnL += isProfit ? amountVal : -amountVal;
+const colorClass = isProfit ? 'border-green-500' : 'border-red-500';
+const amountClass = isProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+const sign = isProfit ? '+' : '-';
 
-            // 2. Fill the form
-            document.getElementById('deal-instrument').value = deal.instrument;
-            document.getElementById('deal-amount').value = deal.amount;
-            document.getElementById('deal-description').value = deal.description;
+const strategyBadge = deal.strategy ? `<span class="px-2 py-0.5 rounded text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 mr-2">#${deal.strategy}</span>` : '';
+const emotionBadge = deal.emotion ? `<span class="px-2 py-0.5 rounded text-xs bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300"> 😩  ${deal.emotion}</span>` : '';
+const screenshotLink = deal.screenshot ? `<a href="${deal.screenshot}" target="_blank" class="text-blue-500 hover:underline text-xs ml-auto flex items-center"> 📷  Screenshot</a>` : '';
+const dealJson = JSON.stringify(deal).replace(/"/g, '&quot;');
+html += `
+<div class="bg-white dark:bg-darkCard p-4 rounded-lg shadow-sm border-l-4 ${colorClass} mb-3 group relative hover:shadow-md transition">
+<div class="flex justify-between items-start mb-2">
+<div>
+<div class="flex items-center gap-2">
+<span class="font-bold text-lg dark:text-white">${deal.instrument}</span>
+<span class="text-xs px-2 py-0.5 rounded ${deal.direction === 'long' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'} font-medium uppercase">${deal.direction}</span>
+</div>
+<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+R:R: ${deal.risk && deal.reward ? '1:'+(deal.reward/deal.risk).toFixed(1) : '-'} | Risk: $${deal.risk || 0}
+</div>
+</div>
+<div class="text-right">
+<div class="font-bold text-xl ${amountClass}">${sign}$${amountVal.toFixed(2)}</div>
+</div>
+</div>
+<div class="flex flex-wrap items-center mt-2 mb-2">
+${strategyBadge}
+${emotionBadge}
+${screenshotLink}
+</div>
 
-            // 3. Select radio buttons
-            try {
-                document.querySelector(`input[name="deal-type"][value="${deal.type}"]`).checked = true;
-                document.querySelector(`input[name="deal-direction"][value="${deal.direction}"]`).checked = true;
-            } catch (e) {
-                console.warn("Error setting radio buttons:", e);
-            }
+${deal.description ? `<p class="text-sm text-gray-600 dark:text-gray-400 border-t dark:border-gray-700 pt-2 mt-2 italic">"${deal.description}"</p>` : ''}
+<div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1 bg-white dark:bg-darkCard pl-2 rounded">
+<button onclick="startEditDeal(${dealJson})" class="p-1 text-gray-400 hover:text-blue-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+<button onclick="deleteDeal('${deal.id}')" class="p-1 text-gray-400 hover:text-red-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+</div>
+</div>
+`;
+});
+} else {
+html = `<div class="text-center py-8 text-gray-400 dark:text-gray-600">
+<svg class="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+<p>No trades for this day</p>
+</div>`;
+}
+document.getElementById('daily-pnl').textContent = `${dailyPnL > 0 ? '+' : ''}${dailyPnL.toFixed(2)}`;
+document.getElementById('daily-pnl').className = `text-2xl font-bold ${dailyPnL >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`;
 
-            // Scroll to form
-            document.getElementById('deal-form-card').scrollIntoView({ behavior: 'smooth' });
-        };
-        
-        // Delete trade
-        window.deleteDeal = (dealId) => {
-            const selectedDateStr = formatDate(selectedDate);
-            
-            if (dealsData[selectedDateStr]) {
-                const initialLength = dealsData[selectedDateStr].length;
-                // Filter the array, removing the deal
-                dealsData[selectedDateStr] = dealsData[selectedDateStr].filter(deal => deal.id !== dealId);
-                
-                if (dealsData[selectedDateStr].length < initialLength) {
-                    // Clean up empty array
-                    if (dealsData[selectedDateStr].length === 0) {
-                        delete dealsData[selectedDateStr];
-                    }
-                    saveDealsToLocalStorage(); // Save to localStorage
-                    showTemporaryMessage('Trade successfully deleted!', 'green');
-                } else {
-                    showTemporaryMessage('Error: Trade not found.', 'red');
-                }
-            }
-            renderCalendar(); 
-            displayDealsForSelectedDate();
-        };
+listEl.innerHTML = html;
+};
 
-        // Display trades for the selected date
-        const displayDealsForSelectedDate = () => {
-            const detailsPanel = document.getElementById('deal-details');
-            const selectedDateStr = formatDate(selectedDate);
-            // Get trades from the local cache
-            const deals = dealsData[selectedDateStr] || [];
+const showTemporaryMessage = (msg, type) => {
+const el = document.getElementById('toast-msg');
+el.textContent = msg;
+el.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-xl text-white transform transition-all duration-300 translate-y-0 z-50 ${type === 'green' ?
+'bg-green-600' : 'bg-red-600'}`;
+setTimeout(() => el.classList.add('translate-y-20'), 3000);
+setTimeout(() => el.classList.remove('translate-y-20'), 100);
+};
 
-            document.getElementById('selected-date-display').textContent = `Selected Date: ${selectedDate.toLocaleDateString('en-US')}`;
+// --- INITIALIZATION ---
+document.addEventListener('DOMContentLoaded', () => {
+initTheme();
+initApp();
+document.getElementById('theme-toggle').onclick = toggleTheme;
+document.getElementById('prev-month').onclick = () => navigateMonth(-1);
+document.getElementById('next-month').onclick = () => navigateMonth(1);
+document.getElementById('save-deal-btn').onclick = saveDeal;
+document.getElementById('cancel-edit-btn').onclick = resetForm;
 
-            let html = '';
+document.getElementById('deal-risk').oninput = calculateRR;
+document.getElementById('deal-reward').oninput = calculateRR;
 
-            // --- PnL CALCULATION START ---
-            let dailyPnL = 0;
-            let totalTrades = deals.length;
-            
-            if (deals.length > 0) {
-                deals.forEach(deal => {
-                    const amount = parseFloat(deal.amount) || 0;
-                    if (deal.type === 'profit') {
-                        dailyPnL += amount;
-                    } else {
-                        dailyPnL -= amount;
-                    }
-                });
-            }
-
-            const pnlColorClass = dailyPnL >= 0 ? 'text-green-600' : 'text-red-600';
-            const pnlSign = dailyPnL > 0 ? '+' : '';
-            
-            // Add PnL Summary Card
-            html += `
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-4 flex justify-between items-center">
-                    <div>
-                        <p class="text-xs text-gray-500 uppercase font-semibold">Daily Net PnL</p>
-                        <p class="text-2xl font-bold ${pnlColorClass}">${pnlSign}${dailyPnL.toFixed(2)}</p>
-                    </div>
-                    <div class="text-right">
-                         <p class="text-xs text-gray-500 uppercase font-semibold">Trades</p>
-                         <p class="text-lg font-medium text-gray-800">${totalTrades}</p>
-                    </div>
-                </div>
-            `;
-            // --- PnL CALCULATION END ---
-
-            if (deals.length === 0) {
-                html += '<p class="text-gray-500 italic">No trades recorded for this day.</p>';
-            } else {
-                html += '<ul class="space-y-3">';
-                // Sort by time (newest first)
-                deals.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-                deals.forEach(deal => {
-                    // Timestamp is stored as an ISO string, convert for display
-                    const dateObj = new Date(deal.timestamp);
-                    const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                    
-                    const isProfit = deal.type === 'profit';
-                    const amountColor = isProfit ? 'text-green-600' : 'text-red-600';
-                    const amountSign = isProfit ? '+' : '-';
-                    const amountDisplay = `${amountSign}${deal.amount ? parseFloat(deal.amount).toFixed(2) : 'N/A'}`;
-                    
-                    const directionText = deal.direction === 'long' ? 'Long (Buy)' : 'Short (Sell)';
-                    const directionColor = deal.direction === 'long' ? 'bg-blue-100 text-blue-800' : 'bg-indigo-100 text-indigo-800';
-                    
-                    const instrumentDisplay = deal.instrument || 'N/A';
-
-                    // Prepare the deal object string for the edit function call
-                    const dealString = JSON.stringify(deal).replace(/"/g, '&quot;');
-
-                    html += `
-                        <li class="bg-white p-4 rounded-xl shadow-lg border-l-4 ${isProfit ? 'border-green-400' : 'border-red-400'} transition duration-150 relative">
-                            <!-- Action Buttons -->
-                            <div class="absolute top-2 right-2 flex space-x-2">
-                                <button onclick="startEditDeal(${dealString})" 
-                                        class="text-gray-500 hover:text-blue-500 transition" title="Edit">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                </button>
-                                <button onclick="deleteDeal('${deal.id}')" 
-                                        class="text-gray-500 hover:text-red-500 transition" title="Delete">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                </button>
-                            </div>
-                            
-                            <div class="flex justify-between items-center mb-2 pr-12">
-                                <span class="font-bold text-lg ${amountColor}">${amountDisplay}</span>
-                                <span class="text-xs text-gray-500">${timeStr}</span>
-                            </div>
-                            
-                            <p class="text-sm font-semibold text-gray-800 mb-1">Instrument: <span class="text-purple-600">${instrumentDisplay}</span></p>
-                            
-                            <div class="flex space-x-2 text-xs mb-2">
-                                <span class="px-2 py-0.5 rounded-full font-medium ${directionColor}">${directionText}</span>
-                            </div>
-
-                            ${deal.description && deal.description.trim() !== '' ? 
-                                `<p class="text-sm text-gray-600 border-t border-gray-100 pt-2 mt-2">Notes: ${deal.description}</p>`
-                                : ''
-                            }
-                        </li>
-                    `;
-                });
-                html += '</ul>';
-            }
-            detailsPanel.innerHTML = html;
-        };
-
-        const saveDeal = () => {
-            // Read all fields
-            const instrumentInput = document.getElementById('deal-instrument');
-            const amountInput = document.getElementById('deal-amount');
-            const descriptionInput = document.getElementById('deal-description');
-            
-            const instrument = instrumentInput.value.trim();
-            const amount = parseFloat(amountInput.value);
-            const description = descriptionInput.value.trim();
-            const selectedDateStr = formatDate(selectedDate);
-
-            // Read selected radio buttons
-            const typeRadio = document.querySelector('input[name="deal-type"]:checked');
-            const directionRadio = document.querySelector('input[name="deal-direction"]:checked');
-
-            const type = typeRadio ? typeRadio.value : 'profit';
-            const direction = directionRadio ? directionRadio.value : 'long';
-
-            // Validation
-            if (!instrument) {
-                showTemporaryMessage('Please enter a trading instrument.', 'red');
-                return;
-            }
-            if (isNaN(amount) || amount <= 0) {
-                showTemporaryMessage('Please enter a valid trade amount (number > 0).', 'red');
-                return;
-            }
-            
-            // Data packet for Add and Update
-            const dealData = {
-                instrument: instrument,
-                amount: amount, 
-                type: type, 
-                direction: direction, 
-                description: description,
-                date: selectedDateStr,
-            };
-
-            if (editingDealId) {
-                // EDIT MODE: Update existing trade
-                if (dealsData[selectedDateStr]) {
-                    const index = dealsData[selectedDateStr].findIndex(d => d.id === editingDealId);
-                    if (index !== -1) {
-                        // Preserve original id and timestamp
-                        dealsData[selectedDateStr][index] = {
-                            ...dealsData[selectedDateStr][index],
-                            ...dealData
-                        };
-                        showTemporaryMessage('Trade successfully updated!', 'green');
-                    } else {
-                        showTemporaryMessage('Error: Trade for update not found.', 'red');
-                    }
-                }
-            } else {
-                // ADD MODE: Add new trade
-                const newDeal = {
-                    ...dealData,
-                    id: crypto.randomUUID(), // Generate unique ID
-                    timestamp: new Date().toISOString() // Store timestamp as ISO string
-                };
-                
-                if (!dealsData[selectedDateStr]) {
-                    dealsData[selectedDateStr] = [];
-                }
-                dealsData[selectedDateStr].push(newDeal);
-                showTemporaryMessage('Trade successfully saved!', 'green');
-            }
-
-            // Save to local storage and update view
-            saveDealsToLocalStorage();
-            renderCalendar();
-            displayDealsForSelectedDate();
-
-            // Reset form
-            resetForm();
-        };
-
-        const showTemporaryMessage = (message, type) => {
-            const msgEl = document.getElementById('deal-message');
-            msgEl.textContent = message;
-            msgEl.className = `p-2 mt-4 text-sm text-center font-medium rounded-lg ${type === 'green' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
-            msgEl.classList.remove('hidden');
-
-            setTimeout(() => {
-                msgEl.classList.add('hidden');
-            }, 3000);
-        };
-
-        // --- SETUP ---
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('prev-month-btn').onclick = () => navigateMonth(-1);
-            document.getElementById('next-month-btn').onclick = () => navigateMonth(1);
-            document.getElementById('prev-year-btn').onclick = () => { currentYear--; renderCalendar(); };
-            document.getElementById('next-year-btn').onclick = () => { currentYear++; renderCalendar(); };
-            document.getElementById('save-deal-btn').onclick = saveDeal;
-            document.getElementById('cancel-edit-btn').onclick = resetForm; // Cancel edit
-
-            // Initialize the application (now uses localStorage)
-            initApp();
-        });
-    </script>
-
-    <style>
-        /* Custom styles */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f7f7;
-        }
-        #calendar-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 4px;
-        }
-        /* Custom styles for radio buttons */
-        input[type="radio"] {
-            appearance: none;
-            width: 1rem;
-            height: 1rem;
-            border-radius: 50%;
-            border: 2px solid #ccc;
-            transition: all 0.2s;
-            cursor: pointer;
-        }
-        input[type="radio"]:checked {
-            border-width: 5px;
-        }
-        input[name="deal-type"][value="profit"]:checked { border-color: #10B981; } /* Green */
-        input[name="deal-type"][value="loss"]:checked { border-color: #EF4444; } /* Red */
-        input[name="deal-direction"][value="long"]:checked { border-color: #3B82F6; } /* Blue */
-        input[name="deal-direction"][value="short"]:checked { border-color: #6366F1; } /* Indigo */
-    </style>
+document.getElementById('export-btn').onclick = exportToCSV;
+document.getElementById('backup-btn').onclick = exportBackupJSON;
+document.getElementById('import-input').onchange = importBackup;
+});
+</script>
+<style>
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+</style>
 </head>
-<body class="p-4 md:p-8 min-h-screen">
+<body class="bg-gray-50 text-gray-800 dark:bg-darkBg dark:text-darkText transition-colors duration-200 min-h-screen font-sans">
+<nav class="bg-white dark:bg-darkCard shadow-sm sticky top-0 z-30">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex justify-between h-16 items-center">
+<div class="flex items-center gap-2">
+<div class="bg-purple-600 text-white p-1.5 rounded-lg">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+</div>
+<span class="text-xl font-extrabold tracking-tight dark:text-white">Tradelog<span class="text-purple-600">Pro</span></span>
+</div>
+<div class="flex items-center gap-3">
+<button id="theme-toggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition" title="Toggle Theme">
+<svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+<svg class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+</button>
+<div class="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1"></div>
+<button id="export-btn" class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-purple-600 transition hidden md:block">Export CSV</button>
+<div class="relative group">
+<button class="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-purple-600 transition flex items-center gap-1">
+Data
+<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+</button>
+<div class="absolute right-0 mt-2 w-48 bg-white dark:bg-darkCard rounded-md shadow-lg py-1 hidden group-hover:block border border-gray-100 dark:border-darkBorder z-50">
+<button id="backup-btn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Download Backup (JSON)</button>
+<label class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer">
+Restore (JSON)
+<input type="file" id="import-input" accept=".json" class="hidden">
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-    <header class="mb-6">
-        <h1 class="text-3xl font-extrabold text-gray-900 mb-2">Tradelogpro</h1>
-        <!-- Auth status removed -->
-    </header>
+<div class="lg:col-span-8 space-y-8">
+<div class="bg-white dark:bg-darkCard rounded-2xl shadow-sm border border-gray-100 dark:border-darkBorder p-6">
+<div class="flex justify-between items-center mb-6">
+<h2 id="current-month-year" class="text-2xl font-bold text-gray-800 dark:text-white capitalize"></h2>
+<div class="flex space-x-2">
+<button id="prev-month" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+<svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+</button>
+<button id="next-month" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+<svg class="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+</button>
+</div>
+</div>
+<div id="calendar-grid" class="grid grid-cols-7 gap-2 sm:gap-4"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="bg-white dark:bg-darkCard rounded-2xl shadow-sm border border-gray-100 dark:border-darkBorder p-6 h-80">
+<h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4">Equity Curve</h3>
+<div class="relative h-60 w-full">
+<canvas id="equityChart"></canvas>
+</div>
+</div>
+<div class="bg-white dark:bg-darkCard rounded-2xl shadow-sm border border-gray-100 dark:border-darkBorder p-6 h-80 flex flex-col items-center">
+<h3 class="text-lg font-bold text-gray-800 dark:text-white mb-2 self-start w-full">Winrate</h3>
+<div class="relative h-56 w-56 mt-2">
+<canvas id="winrateChart"></canvas>
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+<span id="winrate-text" class="text-3xl font-bold text-gray-800 dark:text-white">0%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
 
-    <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <!-- Calendar Column -->
-        <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-2xl">
-            <!-- Calendar Header -->
-            <div class="flex justify-between items-center mb-6 border-b pb-4">
-                <button id="prev-year-btn" class="p-2 text-gray-500 hover:text-purple-600 transition" title="Previous Year">
-                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
-                </button>
-                <button id="prev-month-btn" class="p-2 text-gray-500 hover:text-purple-600 transition" title="Previous Month">
-                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                </button>
-                <h2 id="current-month-year" class="text-2xl font-bold text-gray-800"></h2>
-                <button id="next-month-btn" class="p-2 text-gray-500 hover:text-purple-600 transition" title="Next Month">
-                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                </button>
-                <button id="next-year-btn" class="p-2 text-gray-500 hover:text-purple-600 transition" title="Next Year">
-                    <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7m-8-14l7 7-7 7"></path></svg>
-                </button>
-            </div>
-
-            <!-- Calendar Grid -->
-            <div id="calendar-grid">
-                <!-- Day names and month days will be rendered here by JS -->
-            </div>
-        </div>
-
-        <!-- Details and Form Column -->
-        <div class="lg:col-span-1 space-y-6">
-
-            <!-- Add/Edit Trade Form -->
-            <div id="deal-form-card" class="bg-white p-6 rounded-xl shadow-lg border border-purple-200">
-                <h3 id="selected-date-display" class="text-xl font-bold text-gray-800 mb-4">Selected Date:</h3>
-                <p class="text-lg font-semibold text-purple-600 mb-4 border-b pb-2">Add New Trade / Edit</p>
-
-                <!-- Instrument -->
-                <div class="mb-4">
-                    <label for="deal-instrument" class="block text-sm font-medium text-gray-700 mb-1">Instrument:</label>
-                    <input type="text" id="deal-instrument" placeholder="e.g., BTC, NASDAQ, EUR/USD"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 transition">
-                </div>
-
-                <!-- Amount -->
-                <div class="mb-4">
-                    <label for="deal-amount" class="block text-sm font-medium text-gray-700 mb-1">Amount (Numeric Value):</label>
-                    <input type="number" step="0.01" id="deal-amount" placeholder="0.00"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 transition">
-                </div>
-
-                <!-- Type (Profit/Loss) -->
-                <div class="mb-4 p-3 border border-gray-200 rounded-lg">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Trade Type (+/-):</label>
-                    <div class="flex space-x-6">
-                        <label class="flex items-center">
-                            <input type="radio" name="deal-type" value="profit" class="form-radio" checked>
-                            <span class="ml-2 text-green-700 font-medium">Profit (+)</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="radio" name="deal-type" value="loss" class="form-radio">
-                            <span class="ml-2 text-red-700 font-medium">Loss (-)</span>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Direction (Long/Short) -->
-                <div class="mb-4 p-3 border border-gray-200 rounded-lg">
-                    <label class="block text-sm font-bold text-gray-700 mb-2">Direction (Long/Short):</label>
-                    <div class="flex space-x-6">
-                        <label class="flex items-center">
-                            <input type="radio" name="deal-direction" value="long" class="form-radio" checked>
-                            <span class="ml-2 text-blue-700">Long (Buy)</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="radio" name="deal-direction" value="short" class="form-radio">
-                            <span class="ml-2 text-indigo-700">Short (Sell)</span>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Description (Optional) -->
-                <div class="mb-4">
-                    <label for="deal-description" class="block text-sm font-medium text-gray-700 mb-1">Description (Optional Notes):</label>
-                    <textarea id="deal-description" placeholder="Additional notes about the trade"
-                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500 transition resize-none h-16"></textarea>
-                </div>
-
-                <div class="flex space-x-2">
-                    <button id="save-deal-btn"
-                        class="flex-1 bg-purple-600 text-white font-semibold py-3 rounded-xl hover:bg-purple-700 transition duration-300 shadow-md shadow-purple-300 transform hover:scale-[1.01]">
-                        Save Trade
-                    </button>
-                    <button id="cancel-edit-btn"
-                        class="hidden px-4 bg-gray-300 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-400 transition duration-300 shadow-md" title="Cancel Edit">
-                        Cancel Edit
-                    </button>
-                </div>
-
-                <div id="deal-message" class="hidden mt-4"></div>
-            </div>
-
-            <!-- Trades for Selected Day -->
-            <div class="bg-gray-100 p-6 rounded-xl shadow-lg">
-                <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Trades for Selected Day</h3>
-                <div id="deal-details" class="space-y-3">
-                    <!-- Trades will be loaded here -->
-                    <p class="text-gray-500 italic">Select a date to view trades.</p>
-                </div>
-            </div>
-        </div>
-    </main>
+<div class="lg:col-span-4 space-y-6">
+<div class="bg-white dark:bg-darkCard p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-darkBorder flex justify-between items-center">
+<div>
+<p class="text-sm text-gray-500 dark:text-gray-400 uppercase font-semibold tracking-wider">Daily Net PnL</p>
+<p id="selected-date-display" class="text-xs text-gray-400 dark:text-gray-500 mt-1">Today</p>
+</div>
+<div id="daily-pnl" class="text-2xl font-bold text-gray-800 dark:text-white">$0.00</div>
+</div>
+<div id="deal-form-card" class="bg-white dark:bg-darkCard p-6 rounded-2xl shadow-lg border border-purple-100 dark:border-purple-900/30">
+<h3 class="text-lg font-bold text-gray-800 dark:text-white mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">New Trade</h3>
+<div class="space-y-4">
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Ticker</label>
+<input type="text" id="deal-instrument" placeholder="BTC" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 outline-none dark:text-white transition">
+</div>
+<div>
+<label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Result ($)</label>
+<input type="number" id="deal-amount" placeholder="0.00" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 outline-none dark:text-white transition">
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-gray-50 dark:bg-gray-800 p-2 rounded-lg flex justify-between">
+<label class="cursor-pointer flex items-center gap-1">
+<input type="radio" name="deal-type" value="profit" class="accent-green-500" checked>
+<span class="text-xs font-bold text-green-600 dark:text-green-400">Profit</span>
+</label>
+<label class="cursor-pointer flex items-center gap-1">
+<input type="radio" name="deal-type" value="loss" class="accent-red-500">
+<span class="text-xs font-bold text-red-600 dark:text-red-400">Loss</span>
+</label>
+</div>
+<div class="bg-gray-50 dark:bg-gray-800 p-2 rounded-lg flex justify-between">
+<label class="cursor-pointer flex items-center gap-1">
+<input type="radio" name="deal-direction" value="long" class="accent-blue-500" checked>
+<span class="text-xs font-bold text-blue-600 dark:text-blue-400">Long</span>
+</label>
+<label class="cursor-pointer flex items-center gap-1">
+<input type="radio" name="deal-direction" value="short" class="accent-indigo-500">
+<span class="text-xs font-bold text-indigo-600 dark:text-indigo-400">Short</span>
+</label>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3 relative">
+<div>
+<label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Risk ($)</label>
+<input type="number" id="deal-risk" placeholder="Stop Loss $" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-xs outline-none dark:text-white">
+</div>
+<div>
+<label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Reward ($)</label>
+<input type="number" id="deal-reward" placeholder="Take Profit $" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-xs outline-none dark:text-white">
+</div>
+<div class="absolute -top-1 right-0 text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">R:R <span id="rr-display">-</span></div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Strategy</label>
+<select id="deal-strategy" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2 text-xs outline-none dark:text-white">
+<option value="">Select...</option>
+<option value="breakout">Breakout</option>
+<option value="bounce">Bounce</option>
+<option value="trend">Trend Following</option>
+<option value="counter">Counter-trend</option>
+<option value="fakeout">Fakeout</option>
+<option value="scalp">Scalping</option>
+</select>
+</div>
+<div>
+<label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Emotion</label>
+<select id="deal-emotion" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2 text-xs outline-none dark:text-white">
+<option value="">Select...</option>
+<option value="calm">Calm</option>
+<option value="fear">Fear/FOMO</option>
+<option value="greed">Greed</option>
+<option value="bored">Boredom</option>
+<option value="revenge">Revenge (Tilt)</option>
+</select>
+</div>
+</div>
+<div>
+<label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Screenshot (URL)</label>
+<input type="url" id="deal-screenshot" placeholder="https://tradingview.com/..." class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-xs outline-none dark:text-white">
+</div>
+<div>
+<textarea id="deal-description" placeholder="Entry reason? Mistakes?" class="w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none dark:text-white resize-none h-20"></textarea>
+</div>
+<div class="flex gap-2 pt-2">
+<button id="save-deal-btn" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-purple-500/30 text-sm">Save Trade</button>
+<button id="cancel-edit-btn" class="hidden px-4 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold py-3 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm">X</button>
+</div>
+</div>
+</div>
+<div id="deal-list" class="space-y-3 pb-8"></div>
+</div>
+</div>
+</main>
+<div id="toast-msg" class="translate-y-20 fixed bottom-4 right-4 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-xl transition-transform duration-300 z-50"></div>
 </body>
 </html>
